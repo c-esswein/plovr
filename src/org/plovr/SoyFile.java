@@ -51,6 +51,8 @@ public class SoyFile extends LocalFileJsInput {
       value.setShouldProvideRequireSoyNamespaces(options.useClosureLibrary);
       value.setShouldDeclareTopLevelNamespaces(options.useClosureLibrary);
       value.setIsUsingIjData(options.isUsingInjectedData);
+      value.setShouldGenerateGoogMsgDefs(options.useClosureLibrary);
+      value.setUseGoogIsRtlForBidiGlobalDir(options.useClosureLibrary);
 
       // TODO(mbolin): Make this configurable, though for now, prefer CONCAT
       // because the return type in STRINGBUILDER mode is {string|undefined}

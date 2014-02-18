@@ -52,6 +52,7 @@ public class BuildCommand extends AbstractCommandRunner<BuildCommandOptions> {
 
     for (String configFile: arguments) {
       Config config = ConfigParser.parseFile(new File(configFile));
+      // TODO support for multiple languages
       Compilation compilation;
       try {
         compilation = CompileRequestHandler.compile(config);

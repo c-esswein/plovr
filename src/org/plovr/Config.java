@@ -1,6 +1,8 @@
 package org.plovr;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.reflect.Field;
@@ -51,6 +53,7 @@ import com.google.javascript.jscomp.SourceMap.LocationMapping;
 import com.google.javascript.jscomp.StrictWarningsGuard;
 import com.google.javascript.jscomp.VariableMap;
 import com.google.javascript.jscomp.WarningLevel;
+import com.google.javascript.jscomp.XtbMessageBundle;
 import com.google.template.soy.xliffmsgplugin.XliffMsgPluginModule;
 
 
@@ -164,8 +167,12 @@ public final class Config implements Comparable<Config> {
 
   private final File cssOutputFile;
 
-  private final PrintStream errorStream;
+  private final File translationsDirectory;
 
+  private final String language;
+
+  private final PrintStream errorStream;
+  
   /**
    * @param id Unique identifier for the configuration. This is used as an
    *        argument to the &lt;script> tag that loads the compiled code.
@@ -215,6 +222,8 @@ public final class Config implements Comparable<Config> {
       List<String> allowedNonStandardCssFunctions,
       String gssFunctionMapProviderClassName,
       File cssOutputFile,
+      File translationsDirectory,
+      String language,
       PrintStream errorStream) {
     Preconditions.checkNotNull(defines);
 
@@ -263,6 +272,8 @@ public final class Config implements Comparable<Config> {
     this.gssFunctionMapProviderClassName = gssFunctionMapProviderClassName;
     this.cssOutputFile = cssOutputFile;
     this.errorStream = Preconditions.checkNotNull(errorStream);
+    this.translationsDirectory = translationsDirectory;
+    this.language = language;
   }
 
   public static Builder builder(File relativePathBase, File configFile,
@@ -474,6 +485,14 @@ public final class Config implements Comparable<Config> {
   public List<WebDriverFactory> getWebDriverFactories() {
     return ImmutableList.copyOf(testDrivers);
   }
+  
+  public File getTranslationsDirectory() {
+    return translationsDirectory;
+  }
+
+  public String getLanguage() {
+    return language;
+  }
 
   /**
    * @param path a relative path, such as "foo/bar_test.js" or
@@ -503,9 +522,6 @@ public final class Config implements Comparable<Config> {
     CompilationLevel level = compilationMode.getCompilationLevel();
     logger.info("Compiling with level: " + level);
     PlovrCompilerOptions options = new PlovrCompilerOptions();
-
-    options.setTreatWarningsAsErrors(getTreatWarningsAsErrors());
-
     level.setOptionsForCompilationLevel(options);
     if (debug) {
       level.setDebugOptionsForCompilationLevel(options);
@@ -596,24 +612,25 @@ public final class Config implements Comparable<Config> {
     }
 
     if (variableMapInputFile != null) {
-      try {
-        options.setInputVariableMap(VariableMap.load(
-            variableMapInputFile.getAbsolutePath()));
-      } catch (IOException e) {
-        logger.severe("The variable map input file '" + variableMapInputFile +
-                      "' could not be loaded: " + e.getMessage());
+        try {
+          options.setInputVariableMap(VariableMap.load(
+              variableMapInputFile.getAbsolutePath()));
+        } catch (IOException e) {
+          logger.severe("The variable map input file '" + variableMapInputFile +
+                        "' could not be loaded: " + e.getMessage());
+        }
       }
-    }
 
-    if (propertyMapInputFile != null) {
-      try {
-        options.setInputPropertyMap(VariableMap.load(
-            propertyMapInputFile.getAbsolutePath()));
-      } catch (IOException e) {
-        logger.severe("The property map input file '" + propertyMapInputFile +
-                      "' could not be loaded: " + e.getMessage());
+      if (propertyMapInputFile != null) {
+        try {
+          options.setInputPropertyMap(VariableMap.load(
+              propertyMapInputFile.getAbsolutePath()));
+        } catch (IOException e) {
+          logger.severe("The property map input file '" + propertyMapInputFile +
+                        "' could not be loaded: " + e.getMessage());
+        }
       }
-    }
+
 
     // This is a hack to work around the fact that a SourceMap
     // will not be created unless a file is specified to which the SourceMap
@@ -640,6 +657,24 @@ public final class Config implements Comparable<Config> {
 
     if (getTreatWarningsAsErrors()) {
       options.addWarningsGuard(new StrictWarningsGuard());
+    }
+    
+    if (translationsDirectory != null && language != null) {
+      try {
+        File[] files = translationsDirectory.listFiles(new FilenameFilter() {
+          @Override public boolean accept(File dir, String name) {
+            return name.startsWith(language) && name.endsWith(".xtb");
+          }
+        });
+        if (files.length == 0) {
+          logger.severe("Unable to find translations file for " + language);
+        } else {
+          options.setMessageBundle(
+            new XtbMessageBundle(new FileInputStream(files[0]), null));
+        }
+      } catch (IOException e) {
+        logger.severe("Unable to load translations file: " + e.getMessage());
+      }
     }
 
     // After all of the options are set, apply the experimental Compiler
@@ -933,6 +968,10 @@ public final class Config implements Comparable<Config> {
 
     private PrintStream errorStream = System.err;
 
+    private File translationsDirectory = null;
+
+    private String language = null;
+
     /**
      * Pattern to validate a config id. A config id may not contain funny
      * characters, such as slashes, because ids are used in RESTful URLs, so
@@ -1012,6 +1051,8 @@ public final class Config implements Comparable<Config> {
           gssFunctionMapProviderClassName;
       this.cssOutputFile = config.cssOutputFile;
       this.errorStream = config.errorStream;
+      this.translationsDirectory = config.translationsDirectory;
+      this.language = config.language;
     }
 
     /** Directory against which relative paths should be resolved. */
@@ -1372,9 +1413,17 @@ public final class Config implements Comparable<Config> {
     public void setCssOutputFile(File cssOutputFile) {
       this.cssOutputFile = cssOutputFile;
     }
-
+    
     public void setErrorStream(PrintStream errorStream) {
-      this.errorStream = Preconditions.checkNotNull(errorStream);
+        this.errorStream = Preconditions.checkNotNull(errorStream);
+      }
+
+    public void setTranslationsDirectory(File translationsDirectory) {
+      this.translationsDirectory = translationsDirectory;
+    }
+
+    public void setLanguage(String language) {
+      this.language = language;
     }
 
     public Config build() {
@@ -1462,6 +1511,8 @@ public final class Config implements Comparable<Config> {
           allowedNonStandardFunctions,
           gssFunctionMapProviderClassName,
           cssOutputFile,
+          translationsDirectory,
+          language,
           errorStream);
 
       return config;

@@ -769,6 +769,29 @@ public enum ConfigOption {
       builder.setCssOutputFile(outputFile);
     }
   }),
+
+  TRANSLATIONS("translations", new ConfigUpdater() {
+    @Override
+    public void apply(String translations, Config.Builder builder) {
+      File dir = (translations == null) ? null :
+          new File(maybeResolvePath(translations, builder));
+      builder.setTranslationsDirectory(dir);
+    }
+  }),
+
+  LANGUAGE("language", new ConfigUpdater() {
+    @Override
+    public void apply(String language, Config.Builder builder) {
+      builder.setLanguage(language);
+    }
+
+    @Override
+    public boolean update(String mode, Config.Builder builder) {
+      apply(mode, builder);
+      return true;
+    }
+  }),
+
   ;
 
   private static class ConfigUpdater {

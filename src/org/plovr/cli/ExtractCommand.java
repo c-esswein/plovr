@@ -13,14 +13,13 @@ import org.plovr.ConfigParser;
 import org.plovr.JsInput;
 import org.plovr.Manifest;
 
-import com.google.common.io.CharStreams;
-import com.google.common.io.InputSupplier;
-import com.google.common.io.OutputSupplier;
-import com.google.template.soy.SoyFileSet;
-import com.google.template.soy.msgs.SoyMsgBundle;
-import com.google.template.soy.msgs.SoyMsgPlugin;
-import com.google.template.soy.msgs.SoyMsgBundleHandler.OutputFileOptions;
-import com.google.template.soy.xliffmsgplugin.XliffMsgPlugin;
+import com.google.common.base.CaseFormat;
+import com.google.common.base.Function;
+import com.google.common.collect.Iterables;
+import com.google.javascript.jscomp.GoogleJsMessageIdGenerator;
+import com.google.javascript.jscomp.JsMessage;
+import com.google.javascript.jscomp.JsMessageExtractor;
+import com.google.javascript.jscomp.SourceFile;
 
 public class ExtractCommand extends AbstractCommandRunner<ExtractCommandOptions> {
 
@@ -55,46 +54,88 @@ public class ExtractCommand extends AbstractCommandRunner<ExtractCommandOptions>
       return 1;
     }
 
-    // This logic is modeled after the implementation of
-    // com.google.template.soy.SoyMsgExtractor#execMain(String[]).
-
-    // Select all of the Soy files in the list of inputs and add them to a
-    // SoyFileSet
-    SoyFileSet.Builder sfsBuilder = new SoyFileSet.Builder();
-    for (final JsInput input : inputs) {
-      if (input.isSoyFile()) {
-        InputSupplier<? extends Reader> reader = new InputSupplier<StringReader>() {
-          @Override
-          public StringReader getInput() throws IOException {
-            return new StringReader(input.getTemplateCode());
-          }
-        };
-        sfsBuilder.add(reader, input.getName());
-      }
+    JsMessageExtractor extractor =
+      new JsMessageExtractor(
+        new GoogleJsMessageIdGenerator(null), JsMessage.Style.CLOSURE);
+    System.out.println("<translationbundle lang=\"REPLACE_ME\">");
+    for (JsMessage message : extractor.extractMessages(
+           Iterables.transform(inputs, new Function<JsInput, SourceFile>() {
+               @Override public SourceFile apply(JsInput input) {
+                 return SourceFile.fromGenerator(input.getName(), input);
+               }
+             }))) {
+      System.out.println(
+        "<translation id=\"" + message.getId() + "\">" +
+        formatMessage(message) +
+        "</translation>");
     }
-
-    printMessages(sfsBuilder.build());
+    System.out.println("</translationbundle>");
     return 0;
   }
 
-  /**
-   * Writes the extracted messages to standard out.
-   */
-  private void printMessages(SoyFileSet sfs) throws IOException {
-    SoyMsgBundle msgBundle = sfs.extractMsgs();
-    OutputFileOptions soyOutputFileOptions = new OutputFileOptions();
-    soyOutputFileOptions.setSourceLocaleString("en");
-
-    SoyMsgPlugin msgPlugin = new XliffMsgPlugin();
-    CharSequence seq = msgPlugin.generateExtractedMsgsFile(msgBundle,
-        soyOutputFileOptions);
-    OutputSupplier<PrintStream> out = new OutputSupplier<PrintStream>() {
-      @Override
-      public PrintStream getOutput() throws IOException {
-        return System.out;
+  private String formatMessage(JsMessage message) {
+    StringBuilder out = new StringBuilder();
+    // if (message.getHidden()) {
+    //   out.append("<hidden/>\n");
+    // }
+    // if (message.getDesc() != null) {
+    //   out.append("<desc>" + message.getDesc() + "</desc>\n");
+    // }
+    // if (message.getMeaning() != null) {
+    //   out.append("<meaning>" + message.getMeaning() + "</meaning>\n");
+    // }
+    for (CharSequence part : message.parts()) {
+      // TODO: XML-escape
+      if (part instanceof JsMessage.PlaceholderReference) {
+        // Placeholder References need to be stored in
+        // UPPER_UNDERSCORE format, with some exceptions. See
+        // JsMessageVisitor.toLowerCamelCaseWithNumericSuffixes for
+        // details.
+        String phName = toUpperUnderscoreWithNumbericSuffixes(
+            ((JsMessage.PlaceholderReference)part).getName());
+        out.append("<ph name=\"" + phName + "\"/>");
+      } else {
+        out.append(part);
       }
-    };
-    CharStreams.write(seq, out);
+    }
+    return out.toString();
   }
 
+  /**
+   * Converts the given string from lower-camel case to
+   * upper-underscore case, preserving numeric suffixes. For example,
+   * "name" -> "NAME", "A4_LETTER" -> "a4Letter", "START_SPAN_1_23" ->
+   * "startSpan_1_23". This is done to counteract the logic that
+   * happens when the XTB bundle is read in.
+   */
+  static String toUpperUnderscoreWithNumbericSuffixes(String input) {
+    // Copied from JsMessageVisitor.toLowerCamelCaseWithNumericSuffixes
+    // Determine where the numeric suffixes begin
+    int suffixStart = input.length();
+    while (suffixStart > 0) {
+      char ch = '\0';
+      int numberStart = suffixStart;
+      while (numberStart > 0) {
+        ch = input.charAt(numberStart - 1);
+        if (Character.isDigit(ch)) {
+          numberStart--;
+        } else {
+          break;
+        }
+      }
+      if ((numberStart > 0) && (numberStart < suffixStart) && (ch == '_')) {
+        suffixStart = numberStart - 1;
+      } else {
+        break;
+      }
+    }
+
+    if (suffixStart == input.length()) {
+      return CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, input);
+    } else {
+      return CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE,
+          input.substring(0, suffixStart)) +
+          input.substring(suffixStart);
+    }
+  }
 }

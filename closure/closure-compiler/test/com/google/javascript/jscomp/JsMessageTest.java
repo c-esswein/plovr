@@ -16,6 +16,8 @@
 
 package com.google.javascript.jscomp;
 
+import junit.framework.TestCase;
+
 import org.junit.*;
 
 /**
