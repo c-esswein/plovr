@@ -40,7 +40,7 @@ import org.mozilla.javascript.Context;
 import org.mozilla.javascript.ContextFactory;
 import org.mozilla.javascript.ScriptableObject;
 
-import org.junit.AssertionFailedError;
+import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 
 /**

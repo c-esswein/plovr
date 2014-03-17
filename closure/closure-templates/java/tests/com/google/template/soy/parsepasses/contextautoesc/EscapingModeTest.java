@@ -27,7 +27,7 @@ import com.google.template.soy.data.SoyData;
 import com.google.template.soy.javasrc.codedeps.SoyUtils;
 
 import junit.framework.TestCase;
-import org.junit.AssertionFailedError;
+import junit.framework.AssertionFailedError;
 
 public class EscapingModeTest extends TestCase {
   public final void testDirectiveNames() {
