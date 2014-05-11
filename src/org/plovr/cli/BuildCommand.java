@@ -14,6 +14,7 @@ import org.plovr.Config;
 import org.plovr.ConfigParser;
 import org.plovr.CssHandler;
 import org.plovr.CssHandler.ErrorManager;
+import org.plovr.LanguageConfig.Language;
 import org.plovr.ModuleConfig;
 import org.plovr.io.Streams;
 
@@ -53,8 +54,35 @@ public class BuildCommand extends AbstractCommandRunner<BuildCommandOptions> {
     for (String configFile: arguments) {
       Config config = ConfigParser.parseFile(new File(configFile));
       // TODO support for multiple languages
-      Compilation compilation;
-      try {
+      
+      
+      // compile for each language if languages are set
+      if(config.getLanguageConfig() != null){
+    	  for(Language lang : config.getLanguageConfig().getLanguages()){
+    		  System.out.println("compile for language: " + lang.langKey);
+    		  config.setCurrentLanguage(lang);
+    		  int success = startCompilation(config, options);
+        	  if(success > 0){
+        		  return success;
+        	  }
+        	  System.out.println();
+    	  }
+      }else{
+    	  int success = startCompilation(config, options);
+    	  if(success > 0){
+    		  return success;
+    	  }
+      }
+      
+    }
+
+    return 0;
+  }
+  
+  private int startCompilation(Config config, BuildCommandOptions options) throws IOException{
+	  Compilation compilation;
+	  
+	  try {
         compilation = CompileRequestHandler.compile(config);
       } catch (CompilationException e) {
         e.printStackTrace();
@@ -69,9 +97,8 @@ public class BuildCommand extends AbstractCommandRunner<BuildCommandOptions> {
       if (!isSuccess) {
         return 1;
       }
-    }
-
-    return 0;
+      
+      return 0;
   }
 
   private boolean processResult(Compilation compilation, Config config,
