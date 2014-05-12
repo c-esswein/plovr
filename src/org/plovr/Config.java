@@ -677,6 +677,7 @@ public final class Config implements Comparable<Config> {
 		if(currentLang != null){			
 			try {
 				options.setMessageBundle(new XtbMessageBundle(new FileInputStream(currentLang.translationFile), getId()));
+				options.setLocale(currentLang.langKey);
 			} catch (FileNotFoundException e) {
 				logger.severe("Unable to load translations file: " + e.getMessage());
 			}
