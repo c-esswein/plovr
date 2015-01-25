@@ -137,7 +137,7 @@ public class XtbGenerator {
         if (translationInputStream == null) {
             return null;
         }
-        BufferedReader reader = new BufferedReader(new InputStreamReader(translationInputStream));
+        BufferedReader reader = new BufferedReader(new InputStreamReader(translationInputStream, "UTF-8"));
         StringBuilder content = new StringBuilder();
 
         char[] buffer = new char[512];
